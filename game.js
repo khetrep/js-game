@@ -1,7 +1,7 @@
 'use strict';
 
 function checkIsVector(value, msg) {
-  msg = msg | 'Тип аргумента конструктора должен быть Vector'
+  msg = msg || 'Тип аргумента конструктора должен быть Vector'
   if (!(value instanceof Vector || Vector.isPrototypeOf(value))) {
     throw new Error(msg);
   }
@@ -20,6 +20,7 @@ function checkIsActor(actor) {
     throw new Error('Тип аргумента конструктора должен быть Actor');
   }
 }
+
 class Vector {
   constructor(x = 0, y = 0) {
     this.x = x;
@@ -117,18 +118,17 @@ class Level {
     ) {
       return 'wall';
     }
-    let result = {
-      cell: undefined
-    };
-    this.grid.find(row => {
-      if (row !== undefined) {
-        return row.find(cell => {
-          result.cell = cell;
-          return cell;
-        });
+    for (let rowIndex = Math.floor(pos.y); rowIndex < Math.ceil(pos.y + size.y); rowIndex++) {
+      let row = this.grid[rowIndex];
+      if (row) {
+        for (let col = Math.floor(pos.x); col < Math.ceil(pos.x + size.x); col++) {
+          if (row[col] && (row[col] === 'wall' || row[col] === 'lava')) {
+            return row[col];
+          }
+        }
       }
-    });
-    return result.cell;
+    }
+    return undefined;
   }
   removeActor(actor) {
     this.actors.splice(this.actors.indexOf(actor), 1);
@@ -147,7 +147,7 @@ class Level {
       this.status = 'lost';
       return;
     }
-    if (objectType === 'coin' && actor !== undefined) {
+    if (objectType === 'coin' && actor !== undefined && actor.type === 'coin') {
       this.removeActor(actor);
       if (this.noMoreActors('coin')) {
         this.status = 'won';
@@ -200,19 +200,18 @@ class Fireball extends Actor {
     return 'fireball';
   }
   getNextPosition(time = 1) {
-    let x = this.pos.x + this.speed.x * time;
-    let y = this.pos.y + this.speed.y * time;
-    return new Vector(x, y);
+    return this.pos.plus(this.speed.times(time));
   }
   handleObstacle() {
-    this.speed.x = -this.speed.x;
-    this.speed.y = -this.speed.y;
+    this.speed = this.speed.times(-1);
   }
   act(time, level) {
-    let nextPos = getNextPosition(time);
+    let nextPos = this.getNextPosition(time);
     let obstacle = level.obstacleAt(nextPos, this.size);
     if (obstacle === undefined) {
       this.pos = nextPos;
+    } else {
+      this.handleObstacle();
     }
   }
 }
@@ -220,16 +219,10 @@ class HorizontalFireball extends Fireball {
   constructor(pos = new Vector(0, 0)) {
     super(pos, new Vector(2, 0));
   }
-  handleObstacle() {
-    this.speed.x = -this.speed.x;
-  }
 }
 class VerticalFireball extends Fireball {
   constructor(pos = new Vector(0, 0)) {
     super(pos, new Vector(0, 2));
-  }
-  handleObstacle() {
-    this.speed.y = -this.speed.y;
   }
 }
 class FireRain extends Fireball {
@@ -244,7 +237,7 @@ class FireRain extends Fireball {
 }
 class Coin extends Actor {
   constructor(pos = new Vector(0, 0)) {
-    super(new Vector(pos.x + 0.2, pos.y + 0.1), new Vector(0.6, 0.6));
+    super(pos.plus(new Vector(0.2, 0.1)), new Vector(0.6, 0.6));
     this.originalPos = new Vector(pos.x, pos.y);
     this._spring = Math.random() * 2 * Math.PI;
   }
@@ -261,19 +254,18 @@ class Coin extends Actor {
     return this._spring;
   }
   updateSpring(time = 1) {
-    this._spring = (this._spring + springSpeed() * time) % (2 * Math.PI);
+    this._spring = (this.spring + this.springSpeed * time) % (2 * Math.PI);
   }
   getSpringVector() {
-    let y = Math.sin(this.spring) * this.size.x / 2;
+    let y = Math.sin(this.spring) * this.springDist;
     return new Vector(0, y);
   }
   getNextPosition(time = 1) {
     this.updateSpring(time);
-    let springVector = this.getSpringVector();
-    return new Vector(this.originalPos.x + springVector.x, this.originalPos.y + springVector.y);
+    return this.originalPos.plus(this.getSpringVector());
   }
   act(time) {
-    this.pos = this.getNextPosition();
+    this.pos = this.getNextPosition(time);
   }
 }
 class Player extends Actor {
@@ -294,51 +286,9 @@ const actorDict = {
 }
 const parser = new LevelParser(actorDict);
 
-/*const schemas = [
-  [
-    '         ',
-    '         ',
-    '    =    ',
-    '       o ',
-    '     !xxx',
-    ' @       ',
-    'xxx!     ',
-    '         '
-  ],
-  [
-    '      v  ',
-    '    v    ',
-    '  v      ',
-    '        o',
-    '        x',
-    '@   x    ',
-    'x        ',
-    '         '
-  ]
-];*/
-
-const schemas = [
-  [
-    '         ',
-    '         ',
-    '    =    ',
-    '       o ',
-    '     !xxx',
-    ' @       ',
-    'xxx!     ',
-    '         '
-  ],
-  [
-    '      v  ',
-    '    v    ',
-    '  v      ',
-    '        o',
-    '        x',
-    '@   x    ',
-    'x        ',
-    '         '
-  ]
-];
-
-runGame(schemas, parser, DOMDisplay)
-  .then(() => console.log('Вы выиграли приз!'));
+loadLevels().then(schemasStr => {
+  let schemas = JSON.parse(schemasStr);
+  return runGame(schemas, parser, DOMDisplay);
+}).then(() => {
+  alert('Вы выиграли приз!')
+});
