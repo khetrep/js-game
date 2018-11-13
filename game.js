@@ -1,24 +1,15 @@
 'use strict';
 
-function checkIsVector(value, msg) {
-  msg = msg || 'Тип аргумента конструктора должен быть Vector'
-  if (!(value instanceof Vector || Vector.isPrototypeOf(value))) {
-    throw new Error(msg);
-  }
+function isType(value, cls) {
+  return value instanceof cls || cls.isPrototypeOf(value);
 }
-function isActor(actor) {
-  return actor instanceof Actor || Actor.isPrototypeOf(actor);
+function checkIsType(value, cls, msg = 'Тип аргумента конструктора должен быть ' + cls.name) {
+	if (!isType(value, cls)) {
+	    throw new Error(msg);
+	  }
 }
-function isActorClass(actorClass) {
-  if (actorClass) {
-    return Actor.isPrototypeOf(actorClass) || Actor === actorClass;
-  }
-  return false;
-}
-function checkIsActor(actor) {
-  if (!isActor(actor)) {
-    throw new Error('Тип аргумента конструктора должен быть Actor');
-  }
+function isClass(valueClass, cls) {
+	return valueClass && (cls.isPrototypeOf(valueClass) || cls === valueClass);
 }
 
 class Vector {
@@ -27,7 +18,7 @@ class Vector {
     this.y = y;
   }
   plus(vector) {
-    checkIsVector(vector, 'Можно прибавлять к вектору только вектор типа Vector');
+    checkIsType(vector, Vector, 'Можно прибавлять к вектору только вектор типа Vector');
     return new Vector(this.x + vector.x, this.y + vector.y);
   }
   times(factor) {
@@ -37,9 +28,9 @@ class Vector {
 
 class Actor {
   constructor(pos = new Vector(0, 0), size = new Vector(1, 1), speed = new Vector(0, 0)) {
-    checkIsVector(pos, 'Первый аргумент конструктора "расположение" должен быть типа Vector');
-    checkIsVector(size, 'Второй аргумент конструктора "размер" должен быть типа Vector');
-    checkIsVector(speed, 'Третий аргумент конструктора "скорость" должен быть типа Vector');
+    checkIsType(pos, Vector, 'Первый аргумент конструктора "расположение" должен быть типа Vector');
+    checkIsType(size, Vector, 'Второй аргумент конструктора "размер" должен быть типа Vector');
+    checkIsType(speed, Vector, 'Третий аргумент конструктора "скорость" должен быть типа Vector');
 
     this.pos = pos;
     this.size = size;
@@ -65,7 +56,7 @@ class Actor {
     return 'actor';
   }
   isIntersect(actor) {
-    checkIsActor(actor);
+    checkIsType(actor, Actor);
     if (this === actor) {
       return false;
     }
@@ -100,28 +91,31 @@ class Level {
     return this.status != null && this.finishDelay < 0;
   }
   actorAt(actor) {
-    checkIsActor(actor);
+    checkIsType(actor, Actor);
     return this.actors.find(a => {
       return actor.isIntersect(a) ? a : undefined;
     });
   }
   obstacleAt(pos, size) {
-    checkIsVector(pos);
-    checkIsVector(size);
+    checkIsType(pos, Vector);
+    checkIsType(size, Vector);
     if (pos.y + size.y > this.height) {
       return 'lava';
-    } else if (pos.x + size.x > this.width
-      || pos.x < 0
-      || pos.x + size.x < 0
-      || pos.y < 0
-      || pos.y + size.y < 0
+    }
+    if (pos.x + size.x > this.width
+      || pos.x < 0 || pos.x + size.x < 0
+      || pos.y < 0 || pos.y + size.y < 0
     ) {
       return 'wall';
     }
-    for (let rowIndex = Math.floor(pos.y); rowIndex < Math.ceil(pos.y + size.y); rowIndex++) {
+    const startRow = Math.floor(pos.y);
+    const endRow = Math.ceil(pos.y + size.y);
+    const startColumn = Math.floor(pos.x);
+    const endColumn = Math.ceil(pos.x + size.x);
+    for (let rowIndex = startRow; rowIndex < endRow; rowIndex++) {
       let row = this.grid[rowIndex];
       if (row) {
-        for (let col = Math.floor(pos.x); col < Math.ceil(pos.x + size.x); col++) {
+        for (let col = startColumn; col < endColumn; col++) {
           if (row[col] && (row[col] === 'wall' || row[col] === 'lava')) {
             return row[col];
           }
@@ -135,7 +129,7 @@ class Level {
   }
   noMoreActors(actorType) {
     let found = this.actors.find(actor => {
-      return actor.type === actorType ? true : undefined;
+      return actor.type === actorType;
     });
     return found === undefined;
   }
@@ -169,18 +163,16 @@ class LevelParser {
     return this.obstacle.get(key);
   }
   createGrid(rows) {
-    let self = this;
     return rows.map(value => {
-      return value.split('').map(c => self.obstacleFromSymbol(c));
+      return value.split('').map(c => this.obstacleFromSymbol(c));
     });
   }
   createActors(rows) {
-    let self = this;
     let actors = [];
     rows.forEach((value, row) => {
       value.split('').forEach((c, col) => {
-        let actorClass = self.actorFromSymbol(c);
-        if (isActorClass(actorClass)) {
+        let actorClass = this.actorFromSymbol(c);
+        if (isClass(actorClass, Actor)) {
           actors.push(new actorClass(new Vector(col, row)));
         }
       });
