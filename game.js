@@ -4,12 +4,12 @@ function isType(value, cls) {
   return value instanceof cls || cls.isPrototypeOf(value);
 }
 function checkIsType(value, cls, msg = 'Тип аргумента конструктора должен быть ' + cls.name) {
-	if (!isType(value, cls)) {
-	    throw new Error(msg);
-	  }
+  if (!isType(value, cls)) {
+    throw new Error(msg);
+  }
 }
 function isClass(valueClass, cls) {
-	return valueClass && (cls.isPrototypeOf(valueClass) || cls === valueClass);
+  return valueClass && (cls.isPrototypeOf(valueClass) || cls === valueClass);
 }
 
 class Vector {
