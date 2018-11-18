@@ -60,29 +60,29 @@ class Actor {
     if (this === actor) {
       return false;
     }
-    return !(this.left > actor.right
+    return !(this.left >= actor.right
       || this.right < actor.left
-      || this.top > actor.bottom
+      || this.top >= actor.bottom
       || this.bottom < actor.top);
   }
 }
 
 class Level {
-  constructor(grid, actors) {
+  constructor(grid = [], actors = []) {
     this.grid = grid;
-    this.actors = actors;//TODO check is has coins
-    if (actors !== undefined) {
-      this.player = actors.find(actor => {
-        return actor.type === 'player';
-      });
-    }
+    this.actors = actors;// TODO check is has coins
+    this.player = actors.find(actor => {
+      return actor.type === 'player';
+    });
     this.status = null;
     this.finishDelay = 1;
 
     this.height = this.grid.length;
     let width = 0;
     for (let col of this.grid) {
-      width = Math.max(col.length, width);
+      if (col !== undefined) {
+        width = Math.max(col.length, width);
+      }
     }
     this.width = width;
 
@@ -152,12 +152,12 @@ class Level {
 }
 
 class LevelParser {
-  constructor(dic) {
+  constructor(dic = {}) {
     this.dic = dic;
     this.obstacle = new Map([['x', 'wall'], ['!', 'lava']]);
   }
   actorFromSymbol(key) {
-    return this.dic[key];
+    return key !== undefined ? this.dic[key] : undefined;
   }
   obstacleFromSymbol(key) {
     return this.obstacle.get(key);
@@ -169,14 +169,16 @@ class LevelParser {
   }
   createActors(rows) {
     let actors = [];
-    rows.forEach((value, row) => {
-      value.split('').forEach((c, col) => {
-        let actorClass = this.actorFromSymbol(c);
-        if (isClass(actorClass, Actor)) {
-          actors.push(new actorClass(new Vector(col, row)));
-        }
+    if (Array.isArray(rows)) {
+      rows.forEach((value, row) => {
+        value.split('').forEach((c, col) => {
+          let actorClass = this.actorFromSymbol(c);
+          if (isClass(actorClass, Actor)) {
+            actors.push(new actorClass(new Vector(col, row)));
+          }
+        });
       });
-    });
+    }
     return actors;
   }
   parse(rows) {
@@ -230,8 +232,8 @@ class FireRain extends Fireball {
 class Coin extends Actor {
   constructor(pos = new Vector(0, 0)) {
     super(pos.plus(new Vector(0.2, 0.1)), new Vector(0.6, 0.6));
-    this.originalPos = new Vector(pos.x, pos.y);
-    this._spring = Math.random() * 2 * Math.PI;
+    this.originalPos = new Vector(this.pos.x, this.pos.y);
+    this.spring = Math.random() * 2 * Math.PI;
   }
   get type() {
     return 'coin';
@@ -242,11 +244,8 @@ class Coin extends Actor {
   get springDist() {
     return 0.07;
   }
-  get spring() {
-    return this._spring;
-  }
   updateSpring(time = 1) {
-    this._spring = (this.spring + this.springSpeed * time) % (2 * Math.PI);
+    this.spring = this.spring + this.springSpeed * time;
   }
   getSpringVector() {
     let y = Math.sin(this.spring) * this.springDist;
@@ -261,7 +260,7 @@ class Coin extends Actor {
   }
 }
 class Player extends Actor {
-  constructor(pos) {
+  constructor(pos = new Vector(0, 0)) {
     super(new Vector(pos.x, pos.y - 0.5), new Vector(0.8, 1.5), new Vector(0, 0));
   }
   get type() {
